@@ -19,7 +19,7 @@ jobs:
 
     - name: Get previous tag
       run:
-        echo "PREVIOUS_TAG=$(git -c log.showSignature=false describe --abbrev=0 ${GITHUB_REF#refs/*/}^)" >> $GITHUB_ENV
+        echo "PREVIOUS_TAG=$(git -c log.showSignature=false describe --abbrev=0 ${GITHUB_REF}^)" >> $GITHUB_ENV
 
     - name: Install goreleaser
       uses: goreleaser/goreleaser-action@v2
