@@ -3,6 +3,7 @@ package clickup
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"cloud.google.com/go/firestore"
 	"github.com/gebv/asap-tools/clickup/api"
@@ -32,6 +33,38 @@ func (s *ChangeManager) Sync(ctx context.Context, opts *SyncPreferences, oldTask
 	for _, syncer := range list {
 		// TODO: models must not be modified
 		syncer.Sync(ctx, opts, oldTask, task, changed)
+	}
+}
+
+// ForceSyncForAllTasks force update each task from the database and apply processing to it.
+// Not found tasks from ClickUp API to marked as deleted.
+func (s *ChangeManager) ForceSyncForAllTasks(ctx context.Context, opts *SyncPreferences, teamID string) {
+	list := s.store.AllTeamTasks(ctx, teamID)
+	for idx := range list {
+		oldTask := list[idx]
+		if oldTask.Deleted {
+			// TODO: add index into firestore and add deploy script
+			continue
+		}
+
+		res := s.api.TaskByID(ctx, oldTask.ID)
+		if res.StatusOK() {
+			newTask := ModelTaskFromAPI(ctx, s.store, &res.Task)
+			s.Sync(ctx, opts, oldTask, newTask, true)
+		}
+
+		// ClickUp API returns 404 if the task is not found
+		if res.IsStatus(http.StatusNotFound) {
+			// task was deleted
+			oldTask.Deleted = true
+			s.store.UpsertTask(ctx, oldTask)
+			// TODO: add special logic for terminated tasks
+		}
+
+		if !res.StatusOK() && !res.IsStatus(http.StatusNotFound) {
+			warnIfFailedRequest(s.log, res)
+			s.log.Warn("failed to get task data from ClickUp API", zap.String("task_id", oldTask.ID))
+		}
 	}
 }
 
@@ -89,7 +122,7 @@ nextPage:
 
 		lastTaskUpdatedAt = maxInt64(taskAPI.DateUpdatedTs, lastTaskUpdatedAt)
 
-		task := modelTaskFromAPI(ctx, s.store, &taskAPI)
+		task := ModelTaskFromAPI(ctx, s.store, &taskAPI)
 
 		oldTask, changed := s.AuthorizeTask(ctx, task)
 		s.Sync(ctx, opts, oldTask, task, changed)
@@ -111,7 +144,7 @@ nextPage:
 	}
 }
 
-func modelTaskFromAPI(ctx context.Context, store *Storage, taskAPI *api.Task) *Task {
+func ModelTaskFromAPI(ctx context.Context, store *Storage, taskAPI *api.Task) *Task {
 	model := &Task{
 		StdStoreModel:  NewWithID(TaskModel, taskAPI.ID).(*Task).StdStoreModel,
 		Name:           taskAPI.Name,

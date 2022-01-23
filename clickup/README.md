@@ -1,4 +1,4 @@
-![asap-tools sync with clickup ](../.github/clickup-preview-schema.png)
+![asap-tools sync with clickup ](../.github/clickup-schema.png)
 
 # quick start
 
