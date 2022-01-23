@@ -6,7 +6,7 @@
 The `asap-tools` it is collection of tools to simplify daily monotonous monotonous cases.
 
 In the arsenal today:
-- [go to](https://github.com/gebv/asap-tools/tree/fix/more-details-and-minor-fixes#sync-clickup) syncing tasks (mirror tasks) between ClickUp teams
+- [go to](https://github.com/gebv/asap-tools#sync-clickup) syncing tasks (mirror tasks) between ClickUp teams
 - WIP saving conversations from Slack
 - TODO create github action for very quick starts for the periodic runs of asap-tools
 - TODO syncing tasks between ClickUp and Notion

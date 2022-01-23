@@ -6,6 +6,7 @@ Install `asap-tools` via brew
 
 ```bash
 brew install gebv/tap/asap-tools
+# asap-tools-cli -help
 ```
 
 or download binary files from the [latest release](https://github.com/gebv/asap-tools/releases/latest)
@@ -41,7 +42,7 @@ mirror_task_rules:
     assign_to_member_email: ""
 ```
 
-Set the necessary envs (current on 2021-01-23, show actual envs and command via command `asap-tools clickup --help`)
+Set the necessary envs (current on 2021-01-23, show actual envs and command via command `asap-tools-cli -help`)
 
 ```csv
 KEY                                            TYPE             DEFAULT    REQUIRED    DESCRIPTION
