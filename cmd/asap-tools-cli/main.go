@@ -29,7 +29,7 @@ var (
 	clickupCommands            = flag.NewFlagSet("clickup", flag.ExitOnError)
 	clickupDebugExampleSpecF   = clickupCommands.Bool("debug-example-spec", false, "Shows an example of a spec of sync in yaml format.")
 	clickupRecentActivitySyncF = clickupCommands.Bool("recent-activity-sync", false, "Regular procedure for loading changed tasks from ClickUp API and processing.")
-	clickupDBSyncF             = clickupCommands.Bool("db-sync", false, "Foce loads all tasks from the database and processing. To use if the spec of sync file has been changed. (NOTE: Changed tasks are not loaded from the ClickUp api). ")
+	clickupDBSyncF             = clickupCommands.Bool("db-sync", false, "Foce loads all tasks from the database, loads actual data from the ClickUp API and processing. To use if the spec of sync file has been changed.")
 )
 
 func printAllFlagUsage() {
@@ -82,10 +82,10 @@ func main() {
 		return
 	}
 
-	cfg := &Config{}
-	ParseOrPanic(cfg)
+	Cfg = &Config{}
+	ParseOrPanic(Cfg)
 
-	logger.Setup(cfg.LoggerLevel, cfg.DevelopLogger)
+	logger.Setup(Cfg.LoggerLevel, Cfg.DevelopLogger)
 
 	defer func() {
 		log.Println("Bye-Bye")
@@ -174,18 +174,12 @@ func handleClickupCommands() {
 	api := clickupAPI.NewAPI(Cfg.Clickup.ApiToken)
 	manage := clickup.NewChangeManager(api, clickupStorage)
 
-	if *clickupRecentActivitySyncF {
+	if *clickupDBSyncF {
 		teamIDs := spec.AllUsedTeamIDs()
 
 		zap.L().Info("[PROCESS_EXISTS_TASKS] processing of existing tasks in the database for teams from spec sync", zap.Any("team_ids", teamIDs))
 		for _, teamID := range spec.AllUsedTeamIDs() {
-			list := clickupStorage.AllTeamTasks(Ctx, teamID)
-			for idx := range list {
-				task := list[idx]
-
-				// forced processing
-				manage.Sync(Ctx, spec, task, task, true)
-			}
+			manage.ForceSyncForAllTasks(Ctx, spec, teamID)
 		}
 	}
 

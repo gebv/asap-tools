@@ -6,15 +6,22 @@
 The `asap-tools` it is collection of tools to simplify daily monotonous monotonous cases.
 
 In the arsenal today:
-- syncing tasks (mirror tasks) between ClickUp teams
+- [go to](https://github.com/gebv/asap-tools/tree/fix/more-details-and-minor-fixes#sync-clickup) syncing tasks (mirror tasks) between ClickUp teams
 - WIP saving conversations from Slack
+- TODO create github action for very quick starts for the periodic runs of asap-tools
 - TODO syncing tasks between ClickUp and Notion
+- TODO cross likes between Spotify and Last.fm
+- TODO backup conversations from Telegram direct chat
 
 ## Sync ClickUp
 
 Features
 - create mirror-task and sync (TODO more details)
 - Firestore (database from Google Firebase) is used as permanent storage
+
+![asap-tools sync with clickup ](.github/clickup-preview.gif)
+
+[Guide for quick start](clickup/README.md)
 
 TODO:
 - (draft) magic-action comments and syncing comments
