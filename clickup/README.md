@@ -6,7 +6,11 @@ Install `asap-tools` via brew
 
 ```bash
 brew install gebv/tap/asap-tools
-# asap-tools-cli -help
+# asap-tools-cli -v
+# AsapTools cli version 0.0.3 (darwin_amd64) git commit 40401abab24202e19852464d953e16e99e77125e
+# Build Date: 2022-01-23T05:27:34Z
+# Start Date: 2022-01-23T05:32:02Z
+# https://github.com/gebv/asap-tools
 ```
 
 or download binary files from the [latest release](https://github.com/gebv/asap-tools/releases/latest)
