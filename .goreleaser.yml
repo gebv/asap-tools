@@ -30,8 +30,8 @@ builds:
   ldflags: >
     -s
     -X github.com/gebv/asap-tools/version.Version={{.Version}}
-    -X github.com/gebv/asap-tools/versionGitCommit={{.Commit}}
-    -X github.com/gebv/asap-tools/versionBuildDate={{.Date}}
+    -X github.com/gebv/asap-tools/version.GitCommit={{.Commit}}
+    -X github.com/gebv/asap-tools/version.BuildDate={{.Date}}
 checksum:
   name_template: '{{ .ProjectName }}_checksums.txt'
 snapshot:
