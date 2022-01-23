@@ -79,15 +79,18 @@ func (s *mirrorTaskSyncer) Sync(ctx context.Context, opts *SyncPreferences, oldT
 		}
 	}
 
-	for idx := range rules.addRules {
-		rule := rules.addRules[idx]
+	if !task.IsDeletedOrHidden() {
+		for idx := range rules.addRules {
+			rule := rules.addRules[idx]
 
-		// если среди всех листов не встречается лист для правила добавления
-		// тогда текущая задача кандидант на добавление в зеркало
-		if !listOfMirrorTaskLists[rule.SpecAdd.GetAddToListID()] {
-			s.addMirrorTask(ctx, rule.SpecAdd, task)
+			// если среди всех листов не встречается лист для правила добавления
+			// тогда текущая задача кандидант на добавление в зеркало
+			if !listOfMirrorTaskLists[rule.SpecAdd.GetAddToListID()] {
+				s.addMirrorTask(ctx, rule.SpecAdd, task)
+			}
 		}
 	}
+
 }
 
 func (s *mirrorTaskSyncer) applyChangesToOriginalTask(ctx context.Context, mirror *MirrorTask,
@@ -168,7 +171,7 @@ func (s *mirrorTaskSyncer) applyChangesToOriginalTask(ctx context.Context, mirro
 		updatedTaskAPI := s.api.UpdateTask(ctx, updTask)
 		warnIfFailedRequest(s.log, updatedTaskAPI)
 		if updatedTaskAPI.StatusOK() {
-			updatedTask := modelTaskFromAPI(ctx, s.store, &updatedTaskAPI.Task)
+			updatedTask := ModelTaskFromAPI(ctx, s.store, &updatedTaskAPI.Task)
 			err := s.store.UpsertTask(ctx, updatedTask)
 			warnErrorIf(s.log, err, "failed to update a mirror task after processing changes and apply changes", "task_id", updatedTask.ID)
 		}
@@ -294,7 +297,7 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 		warnIfFailedRequest(s.log, updatedTaskAPI)
 
 		if updatedTaskAPI.StatusOK() {
-			updatedTask := modelTaskFromAPI(ctx, s.store, &updatedTaskAPI.Task)
+			updatedTask := ModelTaskFromAPI(ctx, s.store, &updatedTaskAPI.Task)
 			err := s.store.UpsertTask(ctx, updatedTask)
 			warnErrorIf(s.log, err, "failed to update a mirror task after processing changes and apply changes", "task_id", updatedTask.ID)
 		}
@@ -305,7 +308,7 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 		warnIfFailedRequest(s.log, updatedTaskAPI)
 
 		if updatedTaskAPI.StatusOK() {
-			updatedTask := modelTaskFromAPI(ctx, s.store, &updatedTaskAPI.Task)
+			updatedTask := ModelTaskFromAPI(ctx, s.store, &updatedTaskAPI.Task)
 			err := s.store.UpsertTask(ctx, updatedTask)
 			warnErrorIf(s.log, err, "failed to update a original task after processing changes and apply changes", "task_id", updatedTask.ID)
 		}
