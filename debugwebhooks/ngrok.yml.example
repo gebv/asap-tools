@@ -1,0 +1,7 @@
+authtoken: <YourToken>
+region: eu
+log: stdout
+tunnels:
+  redirect-webhooks:
+    addr: debug-webhooks:8080
+    proto: http

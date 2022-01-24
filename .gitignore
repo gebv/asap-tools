@@ -1,2 +1,5 @@
 dist/
 .env
+.pagekite.rc
+debugwebhooks/ngrok.yml
+*firebase-adminsdk-*.json

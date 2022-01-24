@@ -1,0 +1,12 @@
+services:
+  ngrock:
+    image: ubuntu:eoan
+    command: /ngrok start redirect-webhooks --config=/ngrok.yml
+    volumes:
+      - ./debugwebhooks/ngrok-amd64-linux.bin:/ngrok
+      - ./debugwebhooks/ngrok.yml:/ngrok.yml:ro
+  debug-webhooks:
+    image: golang:1.16-alpine
+    command: go run /app/main.go
+    volumes:
+      - ./debugwebhooks/http_viewer_incoming_requests.go:/app/main.go:ro
