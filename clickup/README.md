@@ -15,6 +15,19 @@ brew install gebv/tap/asap-tools
 
 or download binary files from the [latest release](https://github.com/gebv/asap-tools/releases/latest)
 
+```bash
+curl -L https://github.com/gebv/asap-tools/releases/latest/download/asap-tools_Linux_x86_64.zip > ./file.zip && \
+  unzip ./file.zip
+chmod +x ./asap-tools-cli
+sudo mv ./asap-tools-cli /usr/local/bin/asap-tools-cli
+asap-tools-cli -v
+# AsapTools cli version 0.0.6 (linux_amd64) git commit 598374dedea93708f9b5fc49178b0bd7bea32d6f
+# Build Date: 2022-01-23T07:58:37Z
+# Start Date: 2022-01-23T08:18:30Z
+
+# https://github.com/gebv/asap-tools
+```
+
 Configuring the spec file (command for example yaml file `asap-tools-cli clickup -debug-example-spec`).
 
 ```yaml
@@ -46,7 +59,7 @@ mirror_task_rules:
     assign_to_member_email: ""
 ```
 
-Set the necessary envs (current on 2021-01-23, show actual envs and command via command `asap-tools-cli -help`)
+Set the necessary envs (current on 2021-01-23, show actual envs and commands via command `asap-tools-cli -help`)
 
 ```csv
 KEY                                            TYPE             DEFAULT    REQUIRED    DESCRIPTION
@@ -64,7 +77,7 @@ Run a command to retrieve changed tasks and processing them.
 asap-tools-cli clickup -recent-activity-sync
 ```
 
-After each spec file change, run the command (to apply the spec to existing tasks)
+After each spec file change, run the command (to upgrade and processing to existing tasks)
 
 ```bash
 asap-tools-cli clickup -db-sync
