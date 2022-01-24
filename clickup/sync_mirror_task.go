@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gebv/asap-tools/clickup/api"
 	"go.uber.org/zap"
@@ -57,6 +58,10 @@ func (s *mirrorTaskSyncer) Sync(ctx context.Context, opts *SyncPreferences, oldT
 	listOfMirrorTaskLists := map[string]bool{}
 	for idx := range mirrorList {
 		mirror := mirrorList[idx]
+		if mirror.Destroyed {
+			s.log.Warn("skipped the destroyed mirror-task", zap.String("mirror_task_id", mirror.ModelID()))
+			continue
+		}
 
 		if mirror.TaskRef.ID == task.ID {
 			for idx := range rules.changedRules {
@@ -93,6 +98,14 @@ func (s *mirrorTaskSyncer) Sync(ctx context.Context, opts *SyncPreferences, oldT
 
 }
 
+func (s *mirrorTaskSyncer) destroyMirrorTask(ctx context.Context, mirror *MirrorTask, reason string) {
+	mirror.Destroyed = true
+	mirror.DestroyedAt = TimestampNow()
+	mirror.DestroyedReason = reason
+	err := s.store.UpsertMirrorTask(ctx, mirror)
+	warnErrorIf(s.log, err, "failed destroy mirror task", "model_id", mirror.ModelID())
+}
+
 func (s *mirrorTaskSyncer) applyChangesToOriginalTask(ctx context.Context, mirror *MirrorTask,
 	spec MirrorTaskSpecification, oldTask, task *Task) {
 
@@ -101,8 +114,15 @@ func (s *mirrorTaskSyncer) applyChangesToOriginalTask(ctx context.Context, mirro
 		return
 	}
 
+	if mirror.GetMirrorTask(ctx).IsDeletedOrHidden() {
+		s.sendComment(ctx, task.ID, "UNLINK MIRROR TASK: the mirror task has been DELETED or HIDDEN",
+			spec.CondAdd.IfAssignedToMemberEmail)
+		s.destroyMirrorTask(ctx, mirror, "mirror task has been DELETED or HIDDEN")
+		return
+	}
+
 	commentText := &bytes.Buffer{}
-	fmt.Fprintln(commentText, "The original task has been updated:")
+	fmt.Fprintln(commentText, "The original task has chaned or differences with the mirror task:")
 	needToUpdateTask := false
 	needToSendComment := false
 	updTask := &api.UpdateTaskRequest{
@@ -120,19 +140,23 @@ func (s *mirrorTaskSyncer) applyChangesToOriginalTask(ctx context.Context, mirro
 		needToUpdateTask = true
 		updTask.Description = task.MirrorTaskDescription()
 	}
-	// track task visibility status changes
-	if oldTask.IsDeletedOrHidden() == false && task.IsDeletedOrHidden() == true {
-		fmt.Fprintf(commentText, "- archived or deleted\n")
-		needToSendComment = true
-	}
+
 	// track task status changes
 	if oldTask.StatusName != task.StatusName {
-		fmt.Fprintf(commentText, "- changed task status from %q to %q\n", oldTask.StatusName, task.StatusName)
+		fmt.Fprintf(commentText, "- changed task status name from %q to %q\n", oldTask.StatusName, task.StatusName)
 		needToSendComment = true
 	}
 	// track task clsed at changes
 	if oldTask.DateClosedAt == nil && task.DateClosedAt != nil {
 		fmt.Fprintf(commentText, "- closed\n")
+		needToSendComment = true
+	}
+	if oldTask.Archived == false && oldTask.Archived == true {
+		fmt.Fprintf(commentText, "- archived\n")
+		needToSendComment = true
+	}
+	if oldTask.Deleted == false && oldTask.Deleted == true {
+		fmt.Fprintf(commentText, "- deleted\n")
 		needToSendComment = true
 	}
 
@@ -148,17 +172,64 @@ func (s *mirrorTaskSyncer) applyChangesToOriginalTask(ctx context.Context, mirro
 	}
 
 	// track task estimate changes
-	if (mirror.GetMirrorTask(ctx).TimeEstimateMs != nil && task.TimeEstimateMs != nil &&
-		*mirror.GetMirrorTask(ctx).TimeEstimateMs != *task.TimeEstimateMs) ||
-		mirror.GetMirrorTask(ctx).TimeEstimateMs != task.TimeEstimateMs {
-		fmt.Fprintf(commentText, "- the estimate time doesn't match (orig task %s)\n", task.URL)
+	totalEstimate := task.TotalEstimate()
+	miirorTotalEsimate := mirror.GetMirrorTask(ctx).TotalEstimate()
+	if miirorTotalEsimate > 0 && totalEstimate == 0 {
+		// removed time estimate
+		fmt.Fprintf(commentText, "- different time estimate - should be equal to %q but nil\n", msHuman(miirorTotalEsimate))
 		needToSendComment = true
 	}
+	if totalEstimate > 0 && miirorTotalEsimate > 0 && miirorTotalEsimate != totalEstimate {
+		// changed estimate from to
+		fmt.Fprintf(commentText, "- different time estimate  - equals %s but should be equal to %s\n", msHuman(totalEstimate), msHuman(miirorTotalEsimate))
+		needToSendComment = true
+	}
+	if miirorTotalEsimate == 0 && totalEstimate > 0 {
+		// added estimate
+		fmt.Fprintf(commentText, "- different time estimate - should be nil but equals to %q\n", msHuman(totalEstimate))
+		needToSendComment = true
+	}
+
 	// track task due date changes
-	if (mirror.GetMirrorTask(ctx).DueDateAt != nil && task.DueDateAt != nil &&
-		(*mirror.GetMirrorTask(ctx).DueDateAt).AsTime().Equal((*task.DueDateAt).AsTime())) ||
-		mirror.GetMirrorTask(ctx).DueDateAt != task.DueDateAt {
-		fmt.Fprintf(commentText, "- the due date doesn't match (orig task %s)\n", task.URL)
+	origDueDate := task.DueDateAt
+	mirrorDueDate := mirror.GetMirrorTask(ctx).DueDateAt
+	if origDueDate != nil && mirrorDueDate == nil {
+		// removed duedate
+		fmt.Fprintln(commentText, "- different due date - should be nil")
+		needToSendComment = true
+	}
+	if origDueDate != nil && mirrorDueDate != nil &&
+		(*origDueDate).AsTime().Unix() != (*mirrorDueDate).AsTime().Unix() {
+		// changed duedate from to
+		fmt.Fprintf(commentText, "- different due date  - equals %s but should be equal to %s\n",
+			origDueDate.AsTime().Format(time.RFC3339),
+			mirrorDueDate.AsTime().Format(time.RFC3339))
+		needToSendComment = true
+	}
+	if origDueDate == nil && mirrorDueDate != nil {
+		// added duedate
+		fmt.Fprintln(commentText, "- different due date - should be equal to", mirrorDueDate.AsTime().Format(time.RFC3339))
+		needToSendComment = true
+	}
+
+	origStartDate := task.StartDateAt
+	mirrorStartDate := mirror.GetMirrorTask(ctx).StartDateAt
+	if origStartDate != nil && mirrorStartDate == nil {
+		// removed duedate
+		fmt.Fprintln(commentText, "- different due date - should be nil")
+		needToSendComment = true
+	}
+	if origStartDate != nil && mirrorStartDate != nil &&
+		(*origStartDate).AsTime().Unix() != (*mirrorStartDate).AsTime().Unix() {
+		// changed duedate from to
+		fmt.Fprintf(commentText, "- different due date  - equals %s but should be equal to %s\n",
+			origStartDate.AsTime().Format(time.RFC3339),
+			mirrorStartDate.AsTime().Format(time.RFC3339))
+		needToSendComment = true
+	}
+	if origStartDate == nil && mirrorStartDate != nil {
+		// added duedate
+		fmt.Fprintln(commentText, "- different due date - should be equal to", mirrorStartDate.AsTime().Format(time.RFC3339))
 		needToSendComment = true
 	}
 
@@ -186,12 +257,16 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 	spec MirrorTaskSpecification, oldTask, task *Task) {
 
 	if task.IsDeletedOrHidden() {
-		s.log.Warn("mirror task is archived or closed - aborted handle", zap.String("orig_task_id", mirror.TaskRef.ID),
-			zap.String("mirror_task_id", mirror.TaskRef.ID),
-			zap.String("task_id", task.ID),
-		)
-		s.sendComment(ctx, task.ID, "FYI task was closed or archived but something has changed in her",
+		s.sendComment(ctx, task.ID, "FYI changes have been made to a mirror task that is DELETED or HIDDEN - nothing will be updated in original tasks and UNLINK MIRROR TASK",
 			spec.CondAdd.IfAssignedToMemberEmail)
+		s.destroyMirrorTask(ctx, mirror, "mirror task has been DELETED or HIDDEN")
+		return
+	}
+
+	if mirror.GetTask(ctx).IsDeletedOrHidden() {
+		s.sendComment(ctx, task.ID, "UNLINK MIRROR TASK: the original task has been DELETED or HIDDEN",
+			spec.CondAdd.IfAssignedToMemberEmail)
+		s.destroyMirrorTask(ctx, mirror, "original task has been DELETED or HIDDEN")
 		return
 	}
 
@@ -205,7 +280,7 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 	}
 
 	commentText := &bytes.Buffer{}
-	fmt.Fprintln(commentText, "The mirror task has been updated:")
+	fmt.Fprintln(commentText, "The mirror task has chaned or differences with the original task (by main fields - estimate, due date, start date):")
 	needToUpdateTask := false
 	needToSendComment := false
 	updTask := &api.UpdateTaskRequest{
@@ -225,8 +300,9 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 
 	// visibility status
 	if mirror.GetMirrorTask(ctx).IsDeletedOrHidden() && !mirror.GetTask(ctx).IsDeletedOrHidden() {
-		fmt.Fprintf(commentText, "- orig task is NOT hidden or archived but mirror task is archived or closed. TODO: remove from the mirror?\n")
+		fmt.Fprintf(commentText, "- mirror task has removed. TODO: remove from the mirror?\n")
 		needToSendComment = true
+
 	}
 
 	// TODO: description change
@@ -234,7 +310,7 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 	// status
 	if oldTask != nil && oldTask.StatusName != task.StatusName {
 		// TODO: изменился статус у задачи
-		fmt.Fprintf(commentText, "- changed task status from %q to %q\n", origTask.StatusName, task.StatusName)
+		fmt.Fprintf(commentText, "- changed task status name from %q to %q\n", origTask.StatusName, task.StatusName)
 		needToSendComment = true
 	}
 
@@ -244,16 +320,21 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 		// removed time estimate
 		needToUpdateTask = true
 		updTask.TimeEstimateMs = -1
-	}
-	if origTask.TimeEstimateMs != nil && totalEstimate != *origTask.TimeEstimateMs {
+		fmt.Fprintf(commentText, "- orig task will be updated - time estimate will be removed\n")
+		needToSendComment = true
+	} else if origTask.TimeEstimateMs != nil && totalEstimate != 0 && totalEstimate != *origTask.TimeEstimateMs {
 		// changed estimate from to
 		needToUpdateTask = true
 		updTask.TimeEstimateMs = totalEstimate
+		fmt.Fprintf(commentText, "- orig task will be updated - time estimate will be sets to %s\n", msHuman(totalEstimate))
+		needToSendComment = true
 	}
 	if origTask.TimeEstimateMs == nil && totalEstimate > 0 {
 		// added estimate
 		needToUpdateTask = true
 		updTask.TimeEstimateMs = totalEstimate
+		fmt.Fprintf(commentText, "- orig task will be updated - time estimate will be sets to %s\n", msHuman(totalEstimate))
+		needToSendComment = true
 	}
 
 	// due date
@@ -261,17 +342,23 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 		// removed duedate
 		needToUpdateTask = true
 		updTask.DueDate = -1
+		fmt.Fprintf(commentText, "- orig task will be updated - time due date will be removed\n")
+		needToSendComment = true
 	}
 	if origTask.DueDateAt != nil && task.DueDateAt != nil &&
 		(*origTask.DueDateAt).AsTime().Unix() != (*task.DueDateAt).AsTime().Unix() {
 		// changed duedate from to
 		needToUpdateTask = true
 		updTask.DueDate = (*task.DueDateAt).AsTime().Unix() * 1000
+		fmt.Fprintf(commentText, "- orig task will be updated - time due date will be sets to %s\n", (*task.DueDateAt).AsTime().Format(time.RFC3339))
+		needToSendComment = true
 	}
 	if origTask.DueDateAt == nil && task.DueDateAt != nil {
 		// added duedate
 		needToUpdateTask = true
 		updTask.DueDate = (*task.DueDateAt).AsTime().Unix() * 1000
+		fmt.Fprintf(commentText, "- orig task will be updated - time due date will be sets to %s\n", (*task.DueDateAt).AsTime().Format(time.RFC3339))
+		needToSendComment = true
 	}
 
 	// start date
@@ -279,17 +366,23 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 		// removed startdate
 		needToUpdateTask = true
 		updTask.StartDate = -1
+		fmt.Fprintf(commentText, "- orig task will be updated - time start date will be removed\n")
+		needToSendComment = true
 	}
 	if origTask.StartDateAt != nil && task.StartDateAt != nil &&
 		(*origTask.StartDateAt).AsTime().Unix() != (*task.StartDateAt).AsTime().Unix() {
 		// changed startdate from to
 		needToUpdateTask = true
 		updTask.StartDate = (*task.StartDateAt).AsTime().Unix() * 1000
+		fmt.Fprintf(commentText, "- orig task will be updated - time start date will be sets to %s\n", (*task.StartDateAt).AsTime().Format(time.RFC3339))
+		needToSendComment = true
 	}
 	if origTask.StartDateAt == nil && task.StartDateAt != nil {
 		// added startdate
 		needToUpdateTask = true
 		updTask.StartDate = (*task.StartDateAt).AsTime().Unix() * 1000
+		fmt.Fprintf(commentText, "- orig task will be updated - time start date will be sets to %s\n", (*task.StartDateAt).AsTime().Format(time.RFC3339))
+		needToSendComment = true
 	}
 
 	if needToUpdateMirrorTask {

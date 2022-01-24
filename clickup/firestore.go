@@ -30,6 +30,10 @@ func TimestampFromTimestampWithMilliseconds(in *int64) *Timestamp {
 	return timestamppb.New(time.Unix(*in/1000, 0))
 }
 
+func TimestampNow() *Timestamp {
+	return timestamppb.Now()
+}
+
 func getRefDoc(ctx context.Context, doc *DocRef, model StoreModel) error {
 	err := storage.LoadDocAndPopulate(ctx, doc, model)
 	if err != nil {

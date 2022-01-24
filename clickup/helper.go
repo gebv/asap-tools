@@ -3,6 +3,7 @@ package clickup
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -24,4 +25,8 @@ func warnIfFailedRequest(l *zap.Logger, res interface{ StatusOK() bool }) {
 	if !res.StatusOK() {
 		warnErrorIf(l, errors.New("failed request in ClickUp API"), fmt.Sprintf("response type %T (for detect kind of request)", res))
 	}
+}
+
+func msHuman(in int64) string {
+	return time.Duration(in * int64(time.Millisecond)).String()
 }

@@ -90,6 +90,9 @@ type MirrorTask struct {
 	MirrorTaskRef        *DocRef
 	MirrorTask           *Task    `firestore:"-"`
 	storage              *Storage `firestore:"-"`
+	Destroyed            bool
+	DestroyedReason      string
+	DestroyedAt          *Timestamp
 }
 
 func (t *MirrorTask) GetTask(ctx context.Context) *Task {
