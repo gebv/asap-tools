@@ -115,7 +115,7 @@ func (s *mirrorTaskSyncer) applyChangesToOriginalTask(ctx context.Context, mirro
 	}
 
 	if mirror.GetMirrorTask(ctx).IsDeletedOrHidden() {
-		s.sendComment(ctx, task.ID, "UNLINK MIRROR TASK: the mirror task has been DELETED or HIDDEN",
+		s.sendComment(ctx, mirror.MirrorTaskRef.ID, "UNLINK MIRROR TASK: the mirror task has been DELETED or HIDDEN",
 			spec.CondAdd.IfAssignedToMemberEmail)
 		s.destroyMirrorTask(ctx, mirror, "mirror task has been DELETED or HIDDEN")
 		return
