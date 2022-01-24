@@ -21,6 +21,7 @@ func (s *Storage) ModelMirrorTaskFor(taskID, mirrorTaskID string) *MirrorTask {
 		MirrorTaskID:  mirrorTaskID,
 		TaskRef:       s.DocRef(NewWithID(TaskModel, taskID)),
 		MirrorTaskRef: s.DocRef(NewWithID(TaskModel, mirrorTaskID)),
+		storage:       s,
 	}
 }
 
@@ -57,7 +58,9 @@ func (s *Storage) AllMatchesForMirrorTasks(ctx context.Context, taskID string) (
 			Where("MirrorTaskRef", "==", s.DocRef(NewWithID(TaskModel, taskID))).Documents(ctx)
 		res := s.Iterate(iter, MirrorTaskModel)
 		for idx := range res {
-			list = append(list, res[idx].(*MirrorTask))
+			task := res[idx].(*MirrorTask)
+			task.storage = s
+			list = append(list, task)
 		}
 	}
 	len1 := len(list)
@@ -67,7 +70,9 @@ func (s *Storage) AllMatchesForMirrorTasks(ctx context.Context, taskID string) (
 		res := s.Iterate(iter, MirrorTaskModel)
 
 		for idx := range res {
-			list = append(list, res[idx].(*MirrorTask))
+			task := res[idx].(*MirrorTask)
+			task.storage = s
+			list = append(list, task)
 		}
 	}
 	len2 := len(list)
@@ -83,7 +88,8 @@ type MirrorTask struct {
 	TaskRef              *DocRef
 	Task                 *Task `firestore:"-"`
 	MirrorTaskRef        *DocRef
-	MirrorTask           *Task `firestore:"-"`
+	MirrorTask           *Task    `firestore:"-"`
+	storage              *Storage `firestore:"-"`
 }
 
 func (t *MirrorTask) GetTask(ctx context.Context) *Task {
@@ -92,6 +98,7 @@ func (t *MirrorTask) GetTask(ctx context.Context) *Task {
 	}
 	t.Task = t.Task.NewModel().(*Task)
 	getRefDoc(ctx, t.TaskRef, t.Task)
+	ModelTaskSetupLazyload(ctx, t.storage, t.Task)
 	return t.Task
 }
 
@@ -101,6 +108,7 @@ func (t *MirrorTask) GetMirrorTask(ctx context.Context) *Task {
 	}
 	t.MirrorTask = t.Task.NewModel().(*Task)
 	getRefDoc(ctx, t.MirrorTaskRef, t.MirrorTask)
+	ModelTaskSetupLazyload(ctx, t.storage, t.MirrorTask)
 	return t.MirrorTask
 }
 

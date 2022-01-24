@@ -144,6 +144,24 @@ nextPage:
 	}
 }
 
+func ModelTaskSetupLazyload(ctx context.Context, store *Storage, model *Task) {
+	model.lazyLoadAssignees = func() {
+		model.lazyLoadAssigneesOnce.Do(func() {
+			model.Assignees = store.FetchListMembers(ctx, model.AssigneesRef)
+		})
+	}
+	model.lazyLoadSubTasks = func() {
+		model.lazyLoadSubTasksOnce.Do(func() {
+			model.LinkedTasks = store.FetchListTasks(ctx, model.LinkedTasksRef)
+		})
+	}
+	model.lazyLoadLinkedTasks = func() {
+		model.lazyLoadLinkedTasksOnce.Do(func() {
+			store.LoadSubTasks(ctx, model)
+		})
+	}
+}
+
 func ModelTaskFromAPI(ctx context.Context, store *Storage, taskAPI *api.Task) *Task {
 	model := &Task{
 		StdStoreModel:  NewWithID(TaskModel, taskAPI.ID).(*Task).StdStoreModel,
@@ -190,21 +208,7 @@ func ModelTaskFromAPI(ctx context.Context, store *Storage, taskAPI *api.Task) *T
 		)
 	}
 
-	model.lazyLoadAssignees = func() {
-		model.lazyLoadAssigneesOnce.Do(func() {
-			model.Assignees = store.FetchListMembers(ctx, model.AssigneesRef)
-		})
-	}
-	model.lazyLoadSubTasks = func() {
-		model.lazyLoadSubTasksOnce.Do(func() {
-			model.LinkedTasks = store.FetchListTasks(ctx, model.LinkedTasksRef)
-		})
-	}
-	model.lazyLoadLinkedTasks = func() {
-		model.lazyLoadLinkedTasksOnce.Do(func() {
-			store.LoadSubTasks(ctx, model)
-		})
-	}
+	ModelTaskSetupLazyload(ctx, store, model)
 
 	return model
 }
