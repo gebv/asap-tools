@@ -137,8 +137,9 @@ type Task struct {
 	} `json:"space"`
 
 	Priority *struct {
-		ID int `json:"id,string"`
-	}
+		ID   int `json:"id,string"`
+		Name int `json:"priority"`
+	} `json:"priority"`
 }
 
 func (r *Task) ListLinkedTaskIDs() []string {

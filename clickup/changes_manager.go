@@ -194,6 +194,9 @@ func ModelTaskFromAPI(ctx context.Context, store *Storage, taskAPI *api.Task) *T
 	if taskAPI.Parent != nil {
 		model.ParentTaskRef = store.DocRef(NewWithID(TaskModel, *taskAPI.Parent))
 	}
+	if taskAPI.Priority != nil {
+		model.PriorityID = &taskAPI.Priority.ID
+	}
 
 	for _, taskID := range taskAPI.ListLinkedTaskIDs() {
 		model.LinkedTasksRef = append(model.LinkedTasksRef,
