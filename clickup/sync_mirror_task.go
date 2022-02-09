@@ -307,13 +307,6 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 
 	// TODO: description change
 
-	// status
-	if oldTask != nil && origTask.StatusName != task.StatusName {
-		// TODO: изменился статус у задачи
-		fmt.Fprintf(commentText, "- changed task status name from %q to %q\n", origTask.StatusName, task.StatusName)
-		needToSendComment = true
-	}
-
 	// estimate
 	totalEstimate := task.TotalEstimate()
 	if origTask.TimeEstimateMs != nil && totalEstimate == 0 {
