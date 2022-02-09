@@ -437,6 +437,7 @@ func (s *mirrorTaskSyncer) addMirrorTask(ctx context.Context, spec *SyncRule_Spe
 		RefTaskID:           task.ID,
 		Tags:                []string{"mirror"},
 		DescriptionMarkdown: task.MirrorTaskDescription(),
+		PriorityID:          task.PriorityID,
 	}
 	if spec.SetStatusName != "" {
 		mirrorTask.StatusName = spec.SetStatusName

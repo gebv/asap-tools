@@ -249,6 +249,7 @@ type CreateTaskRequest struct {
 	Tags                []string
 	RefTaskID           string
 	AssignIDs           []string
+	PriorityID          *int
 }
 
 func (r *CreateTaskRequest) buildRequest() *http.Request {
@@ -270,6 +271,9 @@ func (r *CreateTaskRequest) buildRequest() *http.Request {
 	}
 	if len(r.AssignIDs) > 0 {
 		dat["assignees"] = r.AssignIDs
+	}
+	if r.PriorityID != nil {
+		dat["priority"] = *r.PriorityID
 	}
 
 	datBytes, _ := json.Marshal(dat)
