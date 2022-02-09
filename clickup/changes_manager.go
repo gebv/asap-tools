@@ -129,7 +129,7 @@ nextPage:
 	}
 
 	// saved the cursor if it has changed
-	if cursor.Exists() && lastTaskUpdatedAt > cursor.LastTaskUpdatedAt {
+	if lastTaskUpdatedAt > cursor.LastTaskUpdatedAt {
 		err := s.store.UpsertLoadStatusOfChangedTeamTasks(ctx, &LoadStatusOfChangedTeamTasks{
 			TeamID:            teamID,
 			TeamRef:           s.store.DocRef(NewWithID(TeamModel, teamID)),
