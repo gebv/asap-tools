@@ -148,17 +148,17 @@ func (t *MirrorTask) ModelID() string {
 }
 
 func (t *Task) MirrorTaskName(ctx context.Context) string {
-	priority := ""
-	if t.PriorityID != nil {
-		priority = fmt.Sprint("!", *t.PriorityID)
-	}
-	customID := ""
+	taskIDWithName := ""
 	if t.CustomID != nil {
-		customID = "/" + *t.CustomID
+		taskIDWithName = "#" + *t.CustomID
+	} else {
+		taskIDWithName = "#" + t.ID
 	}
 
-	// <ListName>(<CustomID>): (<Priority>)<TaskName>
-	return t.GetList(ctx).Name + customID + ": " + priority + " " + t.Name
+	taskIDWithName += " " + t.Name
+
+	// <ListName>: #<CustomID|TaskID> <TaskName>
+	return t.GetList(ctx).Name + ": " + taskIDWithName
 }
 
 func (t *Task) MirrorTaskDescription() string {
