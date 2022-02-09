@@ -201,7 +201,9 @@ func (a *API) doRequest(ctx context.Context, reqFactory requestBuilder, model se
 
 	if contentType == "application/json" {
 		if err := decodeFromJsonTo(res.Body, model); err != nil {
-			a.log.Warn(fmt.Sprintf("Failed deocode json to model %T", model), zap.String("uri", req.URL.String()), zap.String("method", req.Method), zap.String("body_raw", string(body.String())), zap.String("content_type", contentType))
+			a.log.Warn(fmt.Sprintf("Failed deocode json to model %T", model), zap.String("uri", req.URL.String()), zap.String("method", req.Method), zap.String("body_raw", string(body.String())), zap.String("content_type", contentType),
+				zap.Error(err),
+			)
 
 			model.SetDecodeErr(err)
 

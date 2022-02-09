@@ -137,8 +137,8 @@ type Task struct {
 	} `json:"space"`
 
 	Priority *struct {
-		ID   int `json:"id,string"`
-		Name int `json:"priority"`
+		ID   int    `json:"id,string"`
+		Name string `json:"priority"`
 	} `json:"priority"`
 }
 
