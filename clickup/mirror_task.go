@@ -148,17 +148,8 @@ func (t *MirrorTask) ModelID() string {
 }
 
 func (t *Task) MirrorTaskName(ctx context.Context) string {
-	taskIDWithName := ""
-	if t.CustomID != nil {
-		taskIDWithName = "#" + *t.CustomID
-	} else {
-		taskIDWithName = "#" + t.ID
-	}
-
-	taskIDWithName += " " + t.Name
-
-	// <ListName>: #<CustomID|TaskID> <TaskName>
-	return t.GetList(ctx).Name + ": " + taskIDWithName
+	// <ListName>: <TaskName>
+	return t.GetList(ctx).Name + ": " + t.Name
 }
 
 func (t *Task) MirrorTaskDescription() string {
