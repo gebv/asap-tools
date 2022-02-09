@@ -154,7 +154,7 @@ func (t *Task) MirrorTaskName(ctx context.Context) string {
 
 func (t *Task) MirrorTaskDescription() string {
 	return `Mirror task from ` + t.URL + `
-NOTE: description does not auto-update. Need keep description up to date manually.
+NOTE: DO NOT EDIT - description auto-update from original task
 * * *
 ` + t.Description
 }
