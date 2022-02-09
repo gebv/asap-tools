@@ -178,7 +178,16 @@ func (a *API) doRequest(ctx context.Context, reqFactory requestBuilder, model se
 	req = req.WithContext(ctx)
 
 	res, err := a.client.Do(req)
-	a.log.Debug("API request", zap.Error(err), zap.String("status", res.Status), zap.String("uri", req.URL.String()), zap.String("method", req.Method))
+	var resStatus, reqURL, reqMethod string
+	if res != nil {
+		resStatus = res.Status
+	}
+	if req != nil {
+		reqMethod = req.Method
+		reqURL = req.URL.String()
+	}
+	a.log.Debug("API request", zap.Error(err), zap.String("status", resStatus), zap.String("uri", reqURL), zap.String("method", reqMethod))
+
 	if err != nil {
 		return nil, err
 	}
