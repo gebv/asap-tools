@@ -140,6 +140,23 @@ func (s *mirrorTaskSyncer) applyChangesToOriginalTask(ctx context.Context, mirro
 		needToUpdateTask = true
 		updTask.Description = task.MirrorTaskDescription()
 	}
+	// track priority changes
+	origPriorityID := task.PriorityID
+	mirrorPriorityID := mirror.GetMirrorTask(ctx).PriorityID
+	if origPriorityID != nil && mirrorPriorityID == nil {
+		needToUpdateTask = true
+		updTask.Priority = origPriorityID
+	}
+	if origPriorityID != nil && mirrorPriorityID != nil &&
+		origPriorityID != mirrorPriorityID {
+		needToUpdateTask = true
+		updTask.Priority = origPriorityID
+	}
+	if origPriorityID == nil && mirrorPriorityID != nil {
+		needToUpdateTask = true
+		zero := 0
+		updTask.Priority = &zero
+	}
 
 	// track task status changes
 	if oldTask.StatusName != task.StatusName {

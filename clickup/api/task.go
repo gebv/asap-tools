@@ -162,10 +162,10 @@ func (r Task) ListTags() []string {
 // Update Task
 //////////////////////
 type UpdateTaskRequest struct {
-	TaskID      string
-	Name        string
-	Description string
-	// Priority        int
+	TaskID          string
+	Name            string
+	Description     string
+	Priority        *int
 	StatusName      string
 	TimeEstimateMs  int64
 	AssigneeAdds    []int64
@@ -196,6 +196,9 @@ func (r *UpdateTaskRequest) buildRequest() *http.Request {
 	}
 	if r.TimeEstimateMs == -1 {
 		dat["time_estimate"] = nil
+	}
+	if r.Priority != nil {
+		dat["priority"] = r.Priority
 	}
 
 	assignees := map[string]interface{}{}
