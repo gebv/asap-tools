@@ -95,7 +95,7 @@ type MirrorTask struct {
 	DestroyedAt          *Timestamp
 }
 
-func (t *MirrorTask) GetTask(ctx context.Context) *Task {
+func (t *MirrorTask) GetOrigTask(ctx context.Context) *Task {
 	if t.Task != nil {
 		return t.Task
 	}

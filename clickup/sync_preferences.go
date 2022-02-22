@@ -21,6 +21,34 @@ func ParseSyncPreferences(in io.Reader) (*SyncPreferences, error) {
 
 type SyncPreferences struct {
 	MirrorTaskRules []MirrorTaskSpecification `yaml:"mirror_task_rules"`
+	// ASSERTS: all mirror tasks have the same status life cycle
+	GlobalMirrorTaskStatuses MirrorTaskStatuses `yaml:"global_mirror_task_statuses"`
+}
+
+type MirrorTaskStatuses map[string]MirrorTaskStatus
+
+func (s MirrorTaskStatuses) AllowedSyncEstimate(mirrorTaskStatus string) bool {
+	mirrorTaskStatus = strings.ToLower(mirrorTaskStatus)
+	rule, exists := s[mirrorTaskStatus]
+	if !exists {
+		return false
+	}
+	return rule.SyncEstimateAndDueDateToOrigTask
+}
+
+// returns "" if nothing needs to be done
+func (s MirrorTaskStatuses) SetStatusToOrigTaskIfExists(mirrorTaskStatus string) string {
+	mirrorTaskStatus = strings.ToLower(mirrorTaskStatus)
+	rule, exists := s[mirrorTaskStatus]
+	if !exists {
+		return ""
+	}
+	return rule.SetStatusToOriginalTask
+}
+
+type MirrorTaskStatus struct {
+	SyncEstimateAndDueDateToOrigTask bool   `yaml:"sync_estimate"`
+	SetStatusToOriginalTask          string `yaml:"orig_task_status"`
 }
 
 func (s *SyncPreferences) AllUsedTeamIDs() []string {

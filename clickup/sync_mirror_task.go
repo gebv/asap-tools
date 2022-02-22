@@ -73,13 +73,13 @@ func (s *mirrorTaskSyncer) Sync(ctx context.Context, opts *SyncPreferences, oldT
 		if mirror.MirrorTaskRef.ID == task.ID {
 			for idx := range rules.syncedRules {
 				rule := rules.syncedRules[idx]
-				s.applyChangesToMirrorTask(ctx, mirror, rule, oldTask, task)
+				s.applyChangesToMirrorTask(ctx, mirror, rule, oldTask, task, opts.GlobalMirrorTaskStatuses)
 			}
 		}
 
 		// если среди всех зеркальныйх заданий текущая задача является исходной то
 		// сохраняем listID в котром находится зеркальная задача
-		if task.ID == mirror.GetTask(ctx).ID {
+		if task.ID == mirror.GetOrigTask(ctx).ID {
 			listOfMirrorTaskLists[mirror.GetMirrorTask(ctx).ListRef.ID] = true
 		}
 	}
@@ -271,7 +271,8 @@ func (s *mirrorTaskSyncer) applyChangesToOriginalTask(ctx context.Context, mirro
 }
 
 func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror *MirrorTask,
-	spec MirrorTaskSpecification, oldTask, task *Task) {
+	spec MirrorTaskSpecification, oldTask, task *Task, statuses MirrorTaskStatuses,
+) {
 
 	if task.IsDeletedOrHidden() {
 		s.sendComment(ctx, task.ID, "FYI changes have been made to a mirror task that is DELETED or HIDDEN - nothing will be updated in original tasks and UNLINK MIRROR TASK",
@@ -280,14 +281,14 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 		return
 	}
 
-	if mirror.GetTask(ctx).IsDeletedOrHidden() {
+	if mirror.GetOrigTask(ctx).IsDeletedOrHidden() {
 		s.sendComment(ctx, task.ID, "UNLINK MIRROR TASK: the original task has been DELETED or HIDDEN",
 			spec.CondAdd.IfAssignedToMemberEmail)
 		s.destroyMirrorTask(ctx, mirror, "original task has been DELETED or HIDDEN")
 		return
 	}
 
-	origTask := mirror.GetTask(ctx)
+	origTask := mirror.GetOrigTask(ctx)
 	if !origTask.Exists() {
 		s.log.Warn("handle task for mirror task - orig task was nil (why?)", zap.String("orig_task_id", mirror.TaskRef.ID),
 			zap.String("mirror_task_id", mirror.TaskRef.ID),
@@ -316,83 +317,90 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 	}
 
 	// visibility status
-	if mirror.GetMirrorTask(ctx).IsDeletedOrHidden() && !mirror.GetTask(ctx).IsDeletedOrHidden() {
+	if mirror.GetMirrorTask(ctx).IsDeletedOrHidden() && !mirror.GetOrigTask(ctx).IsDeletedOrHidden() {
 		fmt.Fprintf(commentText, "- mirror task has removed. TODO: remove from the mirror?\n")
 		needToSendComment = true
-
 	}
 
 	// TODO: description change
 
-	// estimate
-	totalEstimate := task.TotalEstimate()
-	if origTask.TimeEstimateMs != nil && totalEstimate == 0 {
-		// removed time estimate
+	if origTaskStatus := statuses.SetStatusToOrigTaskIfExists(mirror.GetMirrorTask(ctx).StatusName); origTaskStatus != "" {
+		// will be set to original task the status
 		needToUpdateTask = true
-		updTask.TimeEstimateMs = -1
-		fmt.Fprintf(commentText, "- orig task will be updated - time estimate will be removed\n")
-		needToSendComment = true
-	} else if origTask.TimeEstimateMs != nil && totalEstimate != 0 && totalEstimate != *origTask.TimeEstimateMs {
-		// changed estimate from to
-		needToUpdateTask = true
-		updTask.TimeEstimateMs = totalEstimate
-		fmt.Fprintf(commentText, "- orig task will be updated - time estimate will be sets to %s\n", msHuman(totalEstimate))
-		needToSendComment = true
-	}
-	if origTask.TimeEstimateMs == nil && totalEstimate > 0 {
-		// added estimate
-		needToUpdateTask = true
-		updTask.TimeEstimateMs = totalEstimate
-		fmt.Fprintf(commentText, "- orig task will be updated - time estimate will be sets to %s\n", msHuman(totalEstimate))
-		needToSendComment = true
+		updTask.StatusName = strings.ToLower(origTaskStatus)
 	}
 
-	// due date
-	if origTask.DueDateAt != nil && task.DueDateAt == nil {
-		// removed duedate
-		needToUpdateTask = true
-		updTask.DueDate = -1
-		fmt.Fprintf(commentText, "- orig task will be updated - time due date will be removed\n")
-		needToSendComment = true
-	}
-	if origTask.DueDateAt != nil && task.DueDateAt != nil &&
-		(*origTask.DueDateAt).AsTime().Unix() != (*task.DueDateAt).AsTime().Unix() {
-		// changed duedate from to
-		needToUpdateTask = true
-		updTask.DueDate = (*task.DueDateAt).AsTime().Unix() * 1000
-		fmt.Fprintf(commentText, "- orig task will be updated - time due date will be sets to %s\n", (*task.DueDateAt).AsTime().Format(time.RFC3339))
-		needToSendComment = true
-	}
-	if origTask.DueDateAt == nil && task.DueDateAt != nil {
-		// added duedate
-		needToUpdateTask = true
-		updTask.DueDate = (*task.DueDateAt).AsTime().Unix() * 1000
-		fmt.Fprintf(commentText, "- orig task will be updated - time due date will be sets to %s\n", (*task.DueDateAt).AsTime().Format(time.RFC3339))
-		needToSendComment = true
-	}
+	if statuses.AllowedSyncEstimate(mirror.GetMirrorTask(ctx).StatusName) {
+		// estimate
+		totalEstimate := task.TotalEstimate()
+		if origTask.TimeEstimateMs != nil && totalEstimate == 0 {
+			// removed time estimate
+			needToUpdateTask = true
+			updTask.TimeEstimateMs = -1
+			fmt.Fprintf(commentText, "- orig task will be updated - time estimate will be removed\n")
+			needToSendComment = true
+		} else if origTask.TimeEstimateMs != nil && totalEstimate != 0 && totalEstimate != *origTask.TimeEstimateMs {
+			// changed estimate from to
+			needToUpdateTask = true
+			updTask.TimeEstimateMs = totalEstimate
+			fmt.Fprintf(commentText, "- orig task will be updated - time estimate will be sets to %s\n", msHuman(totalEstimate))
+			needToSendComment = true
+		}
+		if origTask.TimeEstimateMs == nil && totalEstimate > 0 {
+			// added estimate
+			needToUpdateTask = true
+			updTask.TimeEstimateMs = totalEstimate
+			fmt.Fprintf(commentText, "- orig task will be updated - time estimate will be sets to %s\n", msHuman(totalEstimate))
+			needToSendComment = true
+		}
 
-	// start date
-	if origTask.StartDateAt != nil && task.StartDateAt == nil {
-		// removed startdate
-		needToUpdateTask = true
-		updTask.StartDate = -1
-		fmt.Fprintf(commentText, "- orig task will be updated - time start date will be removed\n")
-		needToSendComment = true
-	}
-	if origTask.StartDateAt != nil && task.StartDateAt != nil &&
-		(*origTask.StartDateAt).AsTime().Unix() != (*task.StartDateAt).AsTime().Unix() {
-		// changed startdate from to
-		needToUpdateTask = true
-		updTask.StartDate = (*task.StartDateAt).AsTime().Unix() * 1000
-		fmt.Fprintf(commentText, "- orig task will be updated - time start date will be sets to %s\n", (*task.StartDateAt).AsTime().Format(time.RFC3339))
-		needToSendComment = true
-	}
-	if origTask.StartDateAt == nil && task.StartDateAt != nil {
-		// added startdate
-		needToUpdateTask = true
-		updTask.StartDate = (*task.StartDateAt).AsTime().Unix() * 1000
-		fmt.Fprintf(commentText, "- orig task will be updated - time start date will be sets to %s\n", (*task.StartDateAt).AsTime().Format(time.RFC3339))
-		needToSendComment = true
+		// due date
+		if origTask.DueDateAt != nil && task.DueDateAt == nil {
+			// removed duedate
+			needToUpdateTask = true
+			updTask.DueDate = -1
+			fmt.Fprintf(commentText, "- orig task will be updated - time due date will be removed\n")
+			needToSendComment = true
+		}
+		if origTask.DueDateAt != nil && task.DueDateAt != nil &&
+			(*origTask.DueDateAt).AsTime().Unix() != (*task.DueDateAt).AsTime().Unix() {
+			// changed duedate from to
+			needToUpdateTask = true
+			updTask.DueDate = (*task.DueDateAt).AsTime().Unix() * 1000
+			fmt.Fprintf(commentText, "- orig task will be updated - time due date will be sets to %s\n", (*task.DueDateAt).AsTime().Format(time.RFC3339))
+			needToSendComment = true
+		}
+		if origTask.DueDateAt == nil && task.DueDateAt != nil {
+			// added duedate
+			needToUpdateTask = true
+			updTask.DueDate = (*task.DueDateAt).AsTime().Unix() * 1000
+			fmt.Fprintf(commentText, "- orig task will be updated - time due date will be sets to %s\n", (*task.DueDateAt).AsTime().Format(time.RFC3339))
+			needToSendComment = true
+		}
+
+		// start date
+		if origTask.StartDateAt != nil && task.StartDateAt == nil {
+			// removed startdate
+			needToUpdateTask = true
+			updTask.StartDate = -1
+			fmt.Fprintf(commentText, "- orig task will be updated - time start date will be removed\n")
+			needToSendComment = true
+		}
+		if origTask.StartDateAt != nil && task.StartDateAt != nil &&
+			(*origTask.StartDateAt).AsTime().Unix() != (*task.StartDateAt).AsTime().Unix() {
+			// changed startdate from to
+			needToUpdateTask = true
+			updTask.StartDate = (*task.StartDateAt).AsTime().Unix() * 1000
+			fmt.Fprintf(commentText, "- orig task will be updated - time start date will be sets to %s\n", (*task.StartDateAt).AsTime().Format(time.RFC3339))
+			needToSendComment = true
+		}
+		if origTask.StartDateAt == nil && task.StartDateAt != nil {
+			// added startdate
+			needToUpdateTask = true
+			updTask.StartDate = (*task.StartDateAt).AsTime().Unix() * 1000
+			fmt.Fprintf(commentText, "- orig task will be updated - time start date will be sets to %s\n", (*task.StartDateAt).AsTime().Format(time.RFC3339))
+			needToSendComment = true
+		}
 	}
 
 	if needToUpdateMirrorTask {
