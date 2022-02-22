@@ -57,6 +57,20 @@ mirror_task_rules:
     add_to_list: https://app.clickup.com/<TeamID>/v/li/<ListID>
     set_status_name: ""
     assign_to_member_email: ""
+# status association
+global_mirror_task_statuses:
+  # status "done" in mirror task says
+  done:
+    # not sync estimate and due date
+    sync_estimate: false
+    # orig task status will be set to "ready"
+    orig_task_status: ready
+  open:
+    sync_estimate: true
+    orig_task_status: in progress
+  wip:
+    sync_estimate: true
+    orig_task_status: in progress
 ```
 
 Set the necessary envs (current on 2021-01-23, show actual envs and commands via command `asap-tools-cli -help`)

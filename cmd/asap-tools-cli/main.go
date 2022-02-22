@@ -130,6 +130,20 @@ func clickupShowDemoSpec() {
 				},
 			},
 		},
+		GlobalMirrorTaskStatuses: clickup.MirrorTaskStatuses{
+			"draft": clickup.MirrorTaskStatus{},
+			"open": clickup.MirrorTaskStatus{
+				SyncEstimateAndDueDateToOrigTask: true,
+				SetStatusToOriginalTask:          "in progress",
+			},
+			"wip": clickup.MirrorTaskStatus{
+				SyncEstimateAndDueDateToOrigTask: true,
+				SetStatusToOriginalTask:          "in progress",
+			},
+			"done": clickup.MirrorTaskStatus{
+				SetStatusToOriginalTask: "ready",
+			},
+		},
 	}
 	specBytes, _ := yaml.Marshal(spec)
 	fmt.Println("Example of spec yaml file for sync ClickUp tasks.")
