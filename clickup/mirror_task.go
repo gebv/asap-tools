@@ -152,8 +152,15 @@ func (t *Task) MirrorTaskName(ctx context.Context) string {
 	return t.GetList(ctx).Name + ": " + t.Name
 }
 
+func (t *Task) MarkdownTaskID() string {
+	if t.CustomID != nil {
+		return "CU-" + *t.CustomID
+	}
+	return "CU-" + t.ID
+}
+
 func (t *Task) MirrorTaskDescription() string {
-	return `Mirror task from ` + t.URL + `
+	return `Mirror task from ` + t.URL + ` ` + t.MarkdownTaskID() + `
 NOTE: DO NOT EDIT - description auto-update from original task
 * * *
 ` + t.Description
