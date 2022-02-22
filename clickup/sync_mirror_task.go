@@ -325,9 +325,11 @@ func (s *mirrorTaskSyncer) applyChangesToMirrorTask(ctx context.Context, mirror 
 	// TODO: description change
 
 	if origTaskStatus := statuses.SetStatusToOrigTaskIfExists(mirror.GetMirrorTask(ctx).StatusName); origTaskStatus != "" {
-		// will be set to original task the status
-		needToUpdateTask = true
-		updTask.StatusName = strings.ToLower(origTaskStatus)
+		if strings.ToLower(mirror.GetOrigTask(ctx).StatusName) != origTaskStatus {
+			// will be set to original task the status
+			needToUpdateTask = true
+			updTask.StatusName = strings.ToLower(origTaskStatus)
+		}
 	}
 
 	if statuses.AllowedSyncEstimate(mirror.GetMirrorTask(ctx).StatusName) {
